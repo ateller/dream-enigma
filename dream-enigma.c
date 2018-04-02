@@ -52,15 +52,80 @@ char **split(char *input)
 	return args;
 }
 
+//подпрограмма для генерации
+//гаммы
+void generate(char *dst);
+
+//и для шифрования
+void xor(int src1, int src2);
+
 int main(int argc, char *argv[])
 {
-	char **args1, **args2;
+	char args;
+	int pipe1[2], pipe2[2], child_pid;
 	printf("Program 1: %s\nProgram 2: %s\n", argv[1], argv[2]);
 	if (argc < 3) {
 		printf("Error: too few arguments");
 		exit(1);
 	}
-	args1 = split(argv[1]);
-	args2 = split(argv[2]);
+	//должно быть не меньше 2 аргументов
+	//(не считая названия программы)
+	if(!strcmp(argv[1], "--generate") {
+		generate(argv[2]);
+		exit(0);
+	}
+	else 
+		if (!strcmp(argv[2], "--generate") {
+			generate(argv[1]);
+			exit(0);
+		}
+	//Если в одном из двух первых
+	//аргументов стоит флаг, 
+	//генерируем гамму на основе 
+	//остального аргумента
+	IF_ERR(pipe(pipe1), -1, "Pipe error", exit(errno););
+	IF_ERR(pipe(pipe2), -1, "Pipe error", exit(errno););
+	child_pid = fork();
+	//Копируем процесс
+	switch (child_pid) {
+	case -1:
+		//если ошибка
+		perror("Fork error:");
+		exit(errno);
+	case 0:
+		IF_ERR(close(1), -1, "Close error", exit(errno);)
+		//Мы - потомок. Закрываем свой
+		//выход
+		child_pid = fork();
+		//Мы- потомок. Дублируемся
+		switch(child_pid) {
+		case -1:
+			//если ошибка
+			perror("Fork error:");
+			exit(errno);
+		case 0;
+			//Мы - внук. Берем 1 аргумент
+			args = split(argv[1]);
+			IF_ERR(dup(pipe1[1], -1, "Dup error", exit(errno);
+			//Вывод в первую трубу
+			break;
+		default:
+			//Мы - потомок. Берем 2 аргумент
+			args = split(argv[2]);
+			IF_ERR(dup(pipe2[1], -1, "Dup error", exit(errno);
+			//Вывод во 2 трубу
+			IF_ERR(wait(&i), -1, "Wait error", exit(errno););
+			//Ждем внука
+		}
+		//Тут уже неважно, кто мы. Просто
+		//Исполняем то, что дадут
+		IF_ERR(execvp(args[0], args), -1, "Exec error", exit(errno););
+	default:
+		//Мы - дед. Ждем сына, который
+		//дождался внука и вывел свой вывод
+		IF_ERR(wait(NULL), -1, "Wait error", exit(errno););
+		xor(pipe1, pipe2);
+		//Ну и начинаем неистово гаммировать
+	}
 	exit(0);
 }
