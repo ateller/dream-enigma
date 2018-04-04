@@ -63,8 +63,8 @@ char **split(char *input)
 
 int run_with_pipe(char **args)
 {
-	int descriptors[2], child_pid;
-	
+	int descriptors[2];
+
 	IF_ERR(pipe(descriptors), -1, "Pipe error", exit(errno););
 	//Открываем трубу
 	switch (fork()) {
@@ -93,14 +93,14 @@ int run_with_pipe(char **args)
 
 //Подбираем имя файла, которое
 //не занято
-int createoutfile(char* name)
+int createoutfile(char *name)
 {
 	int i = 0, len, descr;
 	char path[PATH_SIZE + strlen(name) + 10];
-	//10 состоит из 5 разрядов числа и 
+	//10 состоит из 5 разрядов числа и
 	//4 байта от .out
 	struct stat temp;
-	
+
 	//path = malloc(PATH_SIZE + strlen(name) + 10);
 	//IF_ERR(path, NULL, "Malloc error", exit(errno););
 	IF_ERR(getcwd(path, PATH_SIZE), NULL, "Getcwd error", exit(errno););
@@ -113,7 +113,7 @@ int createoutfile(char* name)
 	}
 	//Допишем / в конец пути
 	strcat(path, name);
-	//Файл будет называться 
+	//Файл будет называться
 	//имяi.out, где i = самое маленькое
 	//число, которое удалось найти такое,
 	//чтобы файла с таким именем не было
@@ -125,13 +125,14 @@ int createoutfile(char* name)
 		gcvt((double) i, 6, path + len);
 		//У нас инт, так что не больше 5
 		//разрядов и 0 байт
-		strcat(path, ".out"); 
+		strcat(path, ".out");
 		i++;
 	} while (stat(path, &temp) != -1);
 	//Если стат вернет -1, такого файла
 	//нету
 	descr = open(path, O_CREAT|O_WRONLY|O_TRUNC, 0664);
 	IF_ERR(descr, -1, path, exit(errno););
+	printf("File %s created\n", path);
 	//Создаем файл и возвращаем дескриптор
 	return descr;
 }
@@ -140,23 +141,23 @@ int createoutfile(char* name)
 //гаммы
 void generate(char *dst)
 {
-	int input, out, i, size;
+	int input, out, i;
 	char buf[PART_SIZE];
-	
+
 	input = run_with_pipe(split(dst));
 	//Запускаем процесс с трубой
 	IF_ERR(wait(NULL), -1, "Wait error", exit(errno););
 	//Ждем, пока он положит в трубу
 	//все, что нужно
-	
+
 	out = createoutfile("gamma");
 	//Создаем выходной файл с
 	//говорящим именем
 	srand(time(NULL));
-	while(true) {
-		size = read(input, buf, PART_SIZE);
+	while (true) {
+		int size = read(input, buf, PART_SIZE);
 		//Читаем и проверяем
-		switch(size) {
+		switch (size) {
 		case -1:
 			//Ошибка
 			perror("Read error");
@@ -165,7 +166,7 @@ void generate(char *dst)
 			//Файл окончен
 			return;
 		}
-		for(i = 0; i < size; i++) 
+		for (i = 0; i < size; i++)
 			buf[i] = rand();
 		//Делаем рандомные байты
 		write(out, buf, size);
@@ -173,23 +174,26 @@ void generate(char *dst)
 }
 
 //и для шифрования
-void xor(char* arg1, char *arg2)
+void xor(char *arg1, char *arg2)
 {
 	int out, size, i, src1, src2;
 	char piece1[PART_SIZE], piece2[PART_SIZE];
-	
+
 	src1 = run_with_pipe(split(arg1));
 	src2 = run_with_pipe(split(arg2));
 	//Запускаем два процесса с трубами
-	IF_ERR(wait(NULL), -1, "Wait error", exit(errno););
-	IF_ERR(wait(NULL), -1, "Wait error", exit(errno););
+	for (i = 0; i < 2; i++) {
+		IF_ERR(wait(&out), -1, "Wait error", exit(errno););
+		if (WEXITSTATUS(out) != EXIT_SUCCESS)
+			exit(EXIT_FAILURE);
+	}
 	//И ждем их
 	out = createoutfile("enigma");
-	while(true) {
+	while (true) {
 		i = read(src1, piece1, PART_SIZE);
 		//Читаем из первой трубы и
 		//Запоминаем, сколько
-		switch(i) {
+		switch (i) {
 		case -1:
 			//Ошибка
 			perror("Read error");
@@ -202,19 +206,19 @@ void xor(char* arg1, char *arg2)
 		if (size < i) {
 			//В size нужен размер
 			//меньшего куска
-			switch(size) {
+			switch (size) {
 			case -1:
 				perror("Read error");
 				exit(errno);
 			case 0:
 				return;
 			}
-		} else 
+		} else
 			size = i;
-			//Если size больше, чем i, 
+			//Если size больше, чем i,
 			//ошибки нет и проверять
 			//нет смысла
-		for(i = 0; i < size; i++) 
+		for (i = 0; i < size; i++)
 			piece1[i] ^= piece2[i];
 		//Побайтно xor
 		write(out, piece1, size);
@@ -226,29 +230,27 @@ int main(int argc, char *argv[])
 {
 	char args;
 	int input1, input2;
+
 	printf("Program 1: %s\nProgram 2: %s\n", argv[1], argv[2]);
 	if (argc < 3) {
 		printf("Error: too few arguments");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	//должно быть не меньше 2 аргументов
 	//(не считая названия программы)
-	if(!strcmp(argv[1], "--generate")) {
+	if (!strcmp(argv[1], "--generate")) {
 		generate(argv[2]);
-		exit(0);
+		exit(EXIT_SUCCESS);
+	} else if (!strcmp(argv[2], "--generate")) {
+		generate(argv[1]);
+		exit(EXIT_SUCCESS);
 	}
-	else 
-		if (!strcmp(argv[2], "--generate")) {
-			generate(argv[1]);
-			exit(0);
-		}
 	//Если в одном из двух первых
-	//аргументов стоит флаг, 
-	//генерируем гамму на основе 
+	//аргументов стоит флаг,
+	//генерируем гамму на основе
 	//остального аргумента
-	
 	xor(argv[1], argv[2]);
 	//Если флага не нашлось, пытаемся
 	//гаммировать по 2 первым аргументам
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
