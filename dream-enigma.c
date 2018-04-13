@@ -226,6 +226,8 @@ void xor(char *arg1, char *arg2)
 	}
 }
 
+//Телятников, группа 3О-309Б
+
 int main(int argc, char *argv[])
 {
 	char args;
